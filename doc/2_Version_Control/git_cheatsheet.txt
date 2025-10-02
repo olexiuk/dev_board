@@ -1,0 +1,16 @@
+git commit -m "message"
+Makes a commit/save with a message
+git branch (new name)
+Creates a new branch with a specified name 
+git checkout (branch name)
+Moves head to the specified branch
+git pull
+fetches changes and then merges them with your local branch
+git push
+uploads your local branch to the remote repo
+git merge (other branch)
+combines two branches into one
+git rebase (branch to be rebased into)
+combines two branches and their histories into one
+git fetch (--rebase)
+downloads changes to the remote repo

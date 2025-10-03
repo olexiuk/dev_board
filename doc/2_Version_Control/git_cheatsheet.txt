@@ -8,9 +8,17 @@ git pull
 fetches changes and then merges them with your local branch
 git push
 uploads your local branch to the remote repo
+git push -u (remote) (branch)
+for first commit of branch
 git merge (other branch)
 combines two branches into one
 git rebase (branch to be rebased into)
 combines two branches and their histories into one
 git fetch (--rebase)
 downloads changes to the remote repo
+git add (file name)
+adds the specified file to the list of files to be tracked
+git status
+shows what files have changed and which are going to be commited
+git log
+shows the history of git commits

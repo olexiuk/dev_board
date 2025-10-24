@@ -16,15 +16,15 @@
 
 int main(void) {
 
-  if (0 > BTN_init()) {
-    return 0;
-  }
-  if (0 > LED_init()) {
-    return 0;
-  }
+    if (0 > BTN_init()) {
+        return 0;
+    }
+    if (0 > LED_init()) {
+        return 0;
+    }
 
-  while(1) {
-    k_msleep(SLEEP_MS);
-  }
+    while(1) {
+        k_msleep(SLEEP_MS);
+    }
 	return 0;
 }

@@ -10,60 +10,50 @@ const enum btn_id_t btns[] = {BTN0, BTN1, BTN2, BTN3};
 const size_t num_leds = sizeof(leds) / sizeof(leds[0]);
 const size_t num_btns = sizeof(btns) / sizeof(btns[0]);
 
-static void leds_off_state_entry(void* o);
-static enum smf_state_result leds_off_state_run(void* o);
+static void setup_state_entry(void* o);
+static enum smf_state_result setup_state_run(void* o);
 
-static void led1_blink_state_entry(void* o);
-static enum smf_state_result led1_blink_state_run(void* o);
-static void led1_blink_state_exit(void* o);
+static void setting_password_state_entry(void* o);
+static enum smf_state_result setting_password_state_run(void* o);
 
-static void odd_leds_on_state_entry(void* o);
-static enum smf_state_result odd_leds_on_state_run(void* o);
-static void odd_leds_on_state_exit(void* o);
+static void locked_state_entry(void* o);
+static enum smf_state_result locked_state_run(void* o);
 
-static void even_leds_on_state_entry(void* o);
-static enum smf_state_result even_leds_on_state_run(void* o);
-static void even_leds_on_state_exit(void* o);
+static void unlocked_state_entry(void* o);
+static enum smf_state_result unlocked_state_run(void* o);
 
-static void leds_blink_state_entry(void* o);
-static enum smf_state_result leds_blink_state_run(void* o);
-static void leds_blink_state_exit(void* o);
-
-
-enum led_state_machine_states 
+enum password_state_machine_states 
 {
-    LEDS_OFF_STATE,
-    LED1_BLINK_STATE,
-    ODD_LEDS_ON_STATE,
-    EVEN_LEDS_ON_STATE,
-    LEDS_BLINK_STATE
+    SETUP_STATE,
+    SETTING_PASSWORD_STATE,
+    LOCKED_STATE,
+    UNLOCKED_STATE
 };
 
 typedef struct
 {
     struct smf_ctx ctx;
     uint16_t count;
-} led_state_object_t;
+} password_state_object_t;
 
-static const struct smf_state led_states[] = {
-    [LEDS_OFF_STATE] = SMF_CREATE_STATE(leds_off_state_entry, leds_off_state_run, NULL, NULL, NULL),
-    [LED1_BLINK_STATE] = SMF_CREATE_STATE(led1_blink_state_entry, led1_blink_state_run, led1_blink_state_exit, NULL, NULL),
-    [ODD_LEDS_ON_STATE] = SMF_CREATE_STATE(odd_leds_on_state_entry, odd_leds_on_state_run, odd_leds_on_state_exit, NULL, NULL),
-    [EVEN_LEDS_ON_STATE] = SMF_CREATE_STATE(even_leds_on_state_entry, even_leds_on_state_run, even_leds_on_state_exit, NULL, NULL),
-    [LEDS_BLINK_STATE] = SMF_CREATE_STATE(leds_blink_state_entry, leds_blink_state_run, leds_blink_state_exit, NULL, NULL)
+static const struct smf_state password_states[] = {
+    [SETUP_STATE] = SMF_CREATE_STATE(setup_state_entry, setup_state_run, NULL, NULL, NULL),
+    [SETTING_PASSWORD_STATE] = SMF_CREATE_STATE(setting_password_state_entry, setting_password_state_run, NULL, NULL, NULL),
+    [LOCKED_STATE] = SMF_CREATE_STATE(locked_state_entry, locked_state_run, NULL, NULL, NULL),
+    [UNLOCKED_STATE] = SMF_CREATE_STATE(unlocked_state_entry, unlocked_state_run, NULL, NULL, NULL),
 };
 
-static led_state_object_t led_state_object;
+static password_state_object_t password_state_object;
 
 void state_machine_init()
 {
-    led_state_object.count = 0;
-    smf_set_initial(SMF_CTX(&led_state_object), &led_states[LEDS_OFF_STATE]);
+    password_state_object.count = 0;
+    smf_set_initial(SMF_CTX(&password_state_object), &password_states[SETUP_STATE]);
 }
 
 int state_machine_run()
 {
-    return smf_run_state(SMF_CTX(&led_state_object));
+    return smf_run_state(SMF_CTX(&password_state_object));
 }
 
 int get_first_button_pressed()
@@ -77,122 +67,107 @@ int get_first_button_pressed()
     return ret;
 }
 
-static void turn_all_leds_off()
-{
-    for (int i = 0; i < num_leds; i++)
-    {
-        LED_set(leds[i], LED_OFF);
-    }
-}
 
-static void leds_off_state_entry(void* o)
-{
-    turn_all_leds_off();
-}
+// each two bits represents a button
+// password can be different lengths
 
-static enum smf_state_result leds_off_state_run(void* o)
-{
-    if (get_first_button_pressed() == BTN0)
-        smf_set_state(SMF_CTX(&led_state_object), &led_states[LED1_BLINK_STATE]);
-    return SMF_EVENT_HANDLED;
-}
+// password is 1233
+// uint16_t password = 0b01101111;
+// uint8_t passwordLength = 4;
 
-static void led1_blink_state_entry(void* o)  
-{
-    LED_blink(LED0, LED_4HZ);
-}
+// password is 12332133
+uint16_t password = 0b0110111110011111;
+uint8_t password_length = 8;
+uint16_t input = 0;
 
-static enum smf_state_result led1_blink_state_run(void* o)
-{
-    enum btn_id_t button_pressed = get_first_button_pressed();
-    if (button_pressed == BTN1)
-        smf_set_state(SMF_CTX(&led_state_object), &led_states[ODD_LEDS_ON_STATE]);
-    if (button_pressed == BTN2)
-        smf_set_state(SMF_CTX(&led_state_object), &led_states[LEDS_BLINK_STATE]);
-    if (button_pressed == BTN3)
-        smf_set_state(SMF_CTX(&led_state_object), &led_states[LEDS_OFF_STATE]);
-    return SMF_EVENT_HANDLED;
-}
+// used to clear any bits past the length of the password
+uint16_t password_cap;
 
-static void led1_blink_state_exit(void* o)
-{
-    LED_set(LED0, LED_OFF);
-}
 
-static void odd_leds_on_state_entry(void* o)
+static void setup_state_entry(void* o)
 {
-    LED_set(LED0, LED_ON);
-    LED_set(LED2, LED_ON);
-}
-
-static enum smf_state_result odd_leds_on_state_run(void* o)
-{
-    if (led_state_object.count < 1000)
-        led_state_object.count++;
-    else
-    {
-        led_state_object.count = 0;
-        smf_set_state(SMF_CTX(&led_state_object), &led_states[EVEN_LEDS_ON_STATE]);
-    }
-    if (get_first_button_pressed() == BTN3)
-    {
-        led_state_object.count = 0;
-        smf_set_state(SMF_CTX(&led_state_object), &led_states[LEDS_OFF_STATE]);
-    }
-    return SMF_EVENT_HANDLED;
-}
-
-static void odd_leds_on_state_exit(void* o)
-{
-    LED_set(LED0, LED_OFF);
-    LED_set(LED2, LED_OFF);
-}
-
-static void even_leds_on_state_entry(void* o)
-{
-    LED_set(LED1, LED_ON);
     LED_set(LED3, LED_ON);
 }
 
-static enum smf_state_result even_leds_on_state_run(void* o)
+static enum smf_state_result setup_state_run(void* o)
 {
-    if (led_state_object.count < 2000)
-        led_state_object.count++;
+    if (password_state_object.count < 3000)
+        password_state_object.count++;
     else
     {
-        led_state_object.count = 0;
-        smf_set_state(SMF_CTX(&led_state_object), &led_states[ODD_LEDS_ON_STATE]);
+        password_state_object.count = 0;
+        password_cap = 0b1111111111111111 >> (16 - (password_length * 2));
+        smf_set_state(SMF_CTX(&password_state_object), &password_states[LOCKED_STATE]);
     }
     if (get_first_button_pressed() == BTN3)
     {
-        led_state_object.count = 0;
-        smf_set_state(SMF_CTX(&led_state_object), &led_states[LEDS_OFF_STATE]);
+        password_state_object.count = 0;
+        smf_set_state(SMF_CTX(&password_state_object), &password_states[SETTING_PASSWORD_STATE]);
     }
     return SMF_EVENT_HANDLED;
 }
 
-static void even_leds_on_state_exit(void* o)
+static void setting_password_state_entry(void* o)
 {
-    LED_set(LED1, LED_OFF);
+    password = 0;
+    password_length = 0;
+}
+
+static enum smf_state_result setting_password_state_run(void* o)
+{
+    int button_pressed = get_first_button_pressed(btns);
+    if (button_pressed == -1)
+        return SMF_EVENT_HANDLED;
+    if (button_pressed == BTN3)
+    {
+        password_cap = 0b1111111111111111 >> (16 - (password_length * 2));
+        smf_set_state(SMF_CTX(&password_state_object), &password_states[LOCKED_STATE]);
+    }
+    else
+    {
+        password = (password << 2 | (button_pressed + 1));
+        if (password_length < 8)
+            password_length++;
+    }
+    return SMF_EVENT_HANDLED;
+}
+
+static void locked_state_entry(void* o)
+{
     LED_set(LED3, LED_OFF);
+    LED_set(LED0, LED_ON);
 }
 
-static void leds_blink_state_entry(void* o)  
+static enum smf_state_result locked_state_run(void* o)
 {
-    for (int i = 0; i < num_leds; i++)
+    int button_pressed = get_first_button_pressed();
+    if (button_pressed == -1)
+        return SMF_EVENT_HANDLED;
+    if (button_pressed == BTN3)
     {
-        LED_blink(leds[i], LED_16HZ);
+        if (password == input)
+        {
+            printk("Correct!\n");
+            smf_set_state(SMF_CTX(&password_state_object), &password_states[UNLOCKED_STATE]);
+        }
+        else
+            printk("Incorrect!\n");
+        input = 0;
     }
-}
-
-static enum smf_state_result leds_blink_state_run(void* o)
-{
-    if (get_first_button_pressed() == BTN3)
-        smf_set_state(SMF_CTX(&led_state_object), &led_states[LEDS_OFF_STATE]);
+    else
+        // add button pressed to front of input and clear bits that are passed the length of the password
+        input = (input << 2 | (button_pressed + 1)) & password_cap;
     return SMF_EVENT_HANDLED;
 }
 
-static void leds_blink_state_exit(void* o)
+static void unlocked_state_entry(void* o)
 {
-    turn_all_leds_off();
+    LED_set(LED0, LED_OFF);
+}
+
+static enum smf_state_result unlocked_state_run(void* o)
+{
+    if (get_first_button_pressed() != -1)
+        smf_set_state(SMF_CTX(&password_state_object), &password_states[LOCKED_STATE]);
+    return SMF_EVENT_HANDLED;
 }

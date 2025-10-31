@@ -62,6 +62,16 @@ uint8_t character = 0;
 
 static enum smf_state_result character_entry_state_run(void* o)
 {
+    if (BTN_is_pressed(BTN0))
+        LED_set(LED0, LED_ON);
+    else
+        LED_set(LED0, LED_OFF);
+
+    if (BTN_is_pressed(BTN1))
+        LED_set(LED1, LED_ON);
+    else
+        LED_set(LED1, LED_OFF);
+
     int button_pressed = get_first_button_pressed();
     if (button_pressed == -1)
         return SMF_EVENT_HANDLED;
@@ -75,8 +85,7 @@ static enum smf_state_result character_entry_state_run(void* o)
         character = 0;
     }
     else
-    {
         character = 0;
-    }
+
     return SMF_EVENT_HANDLED;
 }

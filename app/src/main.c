@@ -7,62 +7,69 @@
 #include <zephyr/kernel.h>
 #include <zephyr/sys/printk.h>
 #include <zephyr/device.h>
-#include <zephyr/drivers/display.h>
-
-#include <lvgl.h>
+#include <zephyr/drivers/gpio.h>
+#include <zephyr/drivers/i2c.h>
 
 #include "BTN.h"
 #include "LED.h"
-#include "lv_data_obj.h"
 
-#define SLEEP_MS 1
+#define SLEEP_MS 1000
 
-static const struct device *display_dev = DEVICE_DT_GET(DT_CHOSEN(zephyr_display));
-static lv_obj_t *screen = NULL;
+#define ACC_PWR_NODE DT_ALIAS(acc_pwr)
+static const struct gpio_dt_spec acc_power = GPIO_DT_SPEC_GET(ACC_PWR_NODE, gpios);
 
-void lv_button_callback(lv_event_t *event)
-{
-  lv_obj_t *data_obj = (lv_obj_t *)lv_event_get_user_data(event);
-  led_id led = *(led_id *)lv_data_obj_get_data_ptr(data_obj);
+#define ACC_ADR               0x68
+#define REG_PWR_MGMT_1        0x6B
+#define REG_DATA_START        0x3B
 
-  LED_toggle(led);
+void init_accel(const struct device *i2c_dev) {
+    uint8_t config[] = {REG_PWR_MGMT_1, 0x00};
+    int ret = i2c_write(i2c_dev, config, sizeof(config), 0x68);
+    if (ret != 0)
+        printk("Failed to turn on accelerometer: %d\n", ret);
+    else
+        printk("Accelerometer on\n");
 }
+
+void read_accel(const struct device *i2c_dev) {
+    uint8_t raw_data[6]; 
+    uint8_t reg = REG_DATA_START;
+
+    if (i2c_write_read(i2c_dev, ACC_ADR, &reg, 1, raw_data, 6) == 0) {
+        int16_t x = (raw_data[0] << 8) | raw_data[1];
+        int16_t y = (raw_data[2] << 8) | raw_data[3];
+        int16_t z = (raw_data[4] << 8) | raw_data[5];
+
+        printk("X: %6d  Y: %6d  Z: %6d\n", x, y, z);
+    } else {
+        printk("Failed to read\n");
+    }
+}
+
+#define I2C0_NODE DT_NODELABEL(i2c0)
+static const struct device *i2c_dev = DEVICE_DT_GET(I2C0_NODE);
 
 int main(void)
 {
-  if (!device_is_ready(display_dev))
+  if (!gpio_is_ready_dt(&acc_power))
+    return 0;
+  if (gpio_pin_configure_dt(&acc_power, GPIO_OUTPUT_ACTIVE) < 0)
     return 0;
 
-  screen = lv_screen_active();
-  if (screen == NULL)
-    return 0;
-  if (0 > BTN_init())
-    return 0;
-  if (0 > LED_init())
-    return 0;
+  gpio_pin_set_dt(&acc_power, 1);
 
-  for (uint8_t i = 0; i < NUM_LEDS; i++)
-  {
-    lv_obj_t *ui_btn = lv_button_create(screen);
-    lv_obj_align(ui_btn, LV_ALIGN_CENTER, 50 * (i % 2 ? 1: -1), 20 * (i < 2 ? -1 : 1));
-    lv_obj_t *button_label = lv_label_create(ui_btn);
-    char label_text[10];
-    snprintf(label_text, 10, "LED %d", i);
-    lv_label_set_text(button_label, label_text);
-    lv_obj_align(button_label, LV_ALIGN_CENTER, 0, 0);
+  k_msleep(200);
 
-    led_id led = (led_id)i;
-    lv_obj_t *data_obj = lv_data_obj_create_alloc_assign(ui_btn, &led, sizeof(led_id));
-    lv_obj_add_event_cb(ui_btn, lv_button_callback, LV_EVENT_CLICKED, data_obj);
+  if (!device_is_ready(i2c_dev)) {
+    return 0;
   }
 
-  // lv_obj_t *label = lv_label_create(screen);
-  // lv_label_set_text(label, "Hello World!");
+  init_accel(i2c_dev);
 
-  display_blanking_off(display_dev);
   while (1) {
-    lv_timer_handler();
+    read_accel(i2c_dev);
     k_msleep(SLEEP_MS);
   }
+
   return 0;
 }

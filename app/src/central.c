@@ -49,6 +49,19 @@ static struct bt_uuid_16 discover_uuid = BT_UUID_INIT_16(0);
 static struct bt_gatt_discover_params discover_params;
 static struct bt_gatt_subscribe_params subscribe_params;
 
+const uint16_t width = 320;
+const uint16_t height = 240;
+const uint8_t diameter = 30;
+const float bouncyness = 0.6f;
+
+lv_obj_t *circle;
+
+float x = 50;
+float y = 50;
+float vel_x = 0;
+float vel_y = 0;
+float max_accel = 1;
+
 /* FUNCTIONS ------------------------------------------------------------------------------------ */
 
 static bool ble_get_adv_device_name_cb(struct bt_data* data, void* user_data) {
@@ -223,8 +236,8 @@ static uint8_t notify_func(struct bt_conn* conn, struct bt_gatt_subscribe_params
 
   if (length >= 2) {
         uint8_t* vals = (uint8_t*) data;
-        // int8_t x = (int8_t) vals[0];   
-        // int8_t y = (int8_t) vals[1];
+        vel_x += max_accel * ((vals[1] / 128.0f) - 1);
+        vel_y += max_accel * ((vals[0] / 128.0f) - 1);
 
         printk("[NOTIFICATION] x=%d, y=%d\n", vals[0], vals[1]);
     } else {
@@ -268,26 +281,11 @@ int start_central(void)
 
   ble_start_scanning();
 
-  printk("HERHEHERRHEHRHEHERHER!!!!!!!!!!!!!!!!!!!!!!");
-
-  uint16_t width = 320;
-  uint16_t height = 240;
-  uint8_t diameter = 30;
-  float x = 50;
-  float y = 50;
-  float vel_x = 0;
-  float vel_y = 0;
-  float max_accel = 5;
-  
-
-  lv_obj_t *circle = lv_obj_create(screen);
+  circle = lv_obj_create(screen);
   lv_obj_set_size(circle, diameter, diameter);
   lv_obj_set_style_radius(circle, LV_RADIUS_CIRCLE, 0);
-
-
-  lv_obj_set_pos(circle, 50, 50);
-
   lv_obj_set_style_bg_color(circle, lv_color_hex(0xFF0000), LV_PART_MAIN);
+  lv_obj_set_pos(circle, x, y);
 
   display_blanking_off(display_dev);
   while (1) {
@@ -298,22 +296,22 @@ int start_central(void)
     if (x + diameter >= width)
     {
       x = width - diameter - (x - (width - diameter));
-      vel_x *= -0.8;
+      vel_x *= -bouncyness;
     }
     else if (x <= 0)
     {
       x *= -1;
-      vel_x *= -0.8;
+      vel_x *= -bouncyness;
     }
     if (y + diameter >= height)
     {
       y = height - diameter - (y - (height - diameter));
-      vel_y *= -0.8;
+      vel_y *= -bouncyness;
     }
     else if (y <= 0)
     {
       y *= -1;
-      vel_y *= -0.8;
+      vel_y *= -bouncyness;
     }
 
     // printf("x: %.2f, y: %.2f, width: %d, height: %d\n", x, y, width, height);

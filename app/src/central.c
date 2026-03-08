@@ -24,7 +24,7 @@ void lv_button_callback(lv_event_t *event)
   LED_toggle(led);
 }
 
-int start_centeral(void)
+int start_central(void)
 {
   if (!device_is_ready(display_dev))
     return 0;

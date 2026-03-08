@@ -4,8 +4,8 @@
 
 #include <zephyr/kernel.h>
 
-void start_central(void);
-void start_peripheral(void);
+int start_central(void);
+int start_peripheral(void);
 
 int main(void)
 {

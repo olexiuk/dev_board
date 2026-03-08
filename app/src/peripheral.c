@@ -25,15 +25,15 @@ static const struct device *i2c_dev = DEVICE_DT_GET(I2C0_NODE);
 #define REG_PWR_MGMT_1        0x6B
 #define REG_DATA_START        0x3B
 
-#define BLE_CUSTOM_SERVICE_UUID BT_UUID_128_ENCODE(0x12345678, 0x1234, 0x5678, 0x1234, 0x56789abcdef0)
-#define BLE_CUSTOM_CHARACTERISTIC_UUID BT_UUID_128_ENCODE(0x12345678, 0x1234, 0x5678, 0x1234, 0x56789abcdef2)
+#define ACCEL_SERVICE_UUID BT_UUID_128_ENCODE(0x12345678, 0x1234, 0x5678, 0x1234, 0x56789abcdef0)
+#define ACCEL_CHARACTERISTIC_UUID BT_UUID_128_ENCODE(0x12345678, 0x1234, 0x5678, 0x1234, 0x56789abcdef2)
 
-static const struct bt_uuid_128 accel_service_uuid = BT_UUID_INIT_128(BLE_CUSTOM_SERVICE_UUID);
-static const struct bt_uuid_128 accel_characteristic_uuid = BT_UUID_INIT_128(BLE_CUSTOM_CHARACTERISTIC_UUID);
+static const struct bt_uuid_128 accel_service_uuid = BT_UUID_INIT_128(ACCEL_SERVICE_UUID);
+static const struct bt_uuid_128 accel_characteristic_uuid = BT_UUID_INIT_128(ACCEL_CHARACTERISTIC_UUID);
 
 static const struct bt_data accel_advertising_data[] = {
     BT_DATA_BYTES(BT_DATA_FLAGS, (BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR)),
-    BT_DATA_BYTES(BT_DATA_UUID128_ALL, BLE_CUSTOM_SERVICE_UUID),
+    BT_DATA_BYTES(BT_DATA_UUID128_ALL, ACCEL_SERVICE_UUID),
 };
 
 static const struct bt_data accel_scan_response_data[] = {

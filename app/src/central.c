@@ -41,6 +41,11 @@ static uint8_t notify_func(struct bt_conn* conn, struct bt_gatt_subscribe_params
 
 /* VARIABLES  ----------------------------------------------------------------------------------- */
 
+static bt_addr_le_t static_addr = {
+    .type = BT_ADDR_LE_RANDOM,
+    .a = {.val = {0x01, 0x02, 0x03, 0x04, 0x05, 0xC1}},
+};
+
 static const struct device *display_dev = DEVICE_DT_GET(DT_CHOSEN(zephyr_display));
 static lv_obj_t *screen = NULL;
 
@@ -83,6 +88,10 @@ static void ble_on_advertisement_received(const bt_addr_le_t* addr, int8_t rssi,
   int err;
 
   if (my_connection) {
+    return;
+  }
+
+  if (bt_addr_le_cmp(addr, &static_addr) != 0) {
     return;
   }
 
@@ -293,22 +302,22 @@ int start_central(void)
     k_msleep(SLEEP_MS);
     x += vel_x;
     y += vel_y;
-    if (x + diameter >= width)
+    if (x + diameter > width)
     {
       x = width - diameter - (x - (width - diameter));
       vel_x *= -bouncyness;
     }
-    else if (x <= 0)
+    else if (x < 0)
     {
       x *= -1;
       vel_x *= -bouncyness;
     }
-    if (y + diameter >= height)
+    if (y + diameter > height)
     {
       y = height - diameter - (y - (height - diameter));
       vel_y *= -bouncyness;
     }
-    else if (y <= 0)
+    else if (y < 0)
     {
       y *= -1;
       vel_y *= -bouncyness;

@@ -13,7 +13,7 @@
 #include "BTN.h"
 #include "LED.h"
 
-#define SLEEP_MS 100
+#define SLEEP_MS 50
 
 #define ACC_PWR_NODE DT_ALIAS(acc_pwr)
 static const struct gpio_dt_spec acc_power = GPIO_DT_SPEC_GET(ACC_PWR_NODE, gpios);
@@ -30,6 +30,10 @@ static const struct device *i2c_dev = DEVICE_DT_GET(I2C0_NODE);
 
 static const struct bt_uuid_128 accel_service_uuid = BT_UUID_INIT_128(ACCEL_SERVICE_UUID);
 static const struct bt_uuid_128 accel_characteristic_uuid = BT_UUID_INIT_128(ACCEL_CHARACTERISTIC_UUID);
+static bt_addr_le_t static_addr = {
+    .type = BT_ADDR_LE_RANDOM,
+    .a = {.val = {0x01, 0x02, 0x03, 0x04, 0x05, 0xC1}},
+};
 
 static const struct bt_data accel_advertising_data[] = {
     BT_DATA_BYTES(BT_DATA_FLAGS, (BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR)),
@@ -121,9 +125,12 @@ int start_peripheral(void)
 
     init_accel(i2c_dev);
 
-    if (bt_enable(NULL))
+    if (bt_id_create(&static_addr, NULL))
         return 0;
 
+    if (bt_enable(NULL))
+        return 0;
+    
     if (bt_le_adv_start(BT_LE_ADV_CONN_FAST_1, accel_advertising_data, ARRAY_SIZE(accel_advertising_data), accel_scan_response_data, ARRAY_SIZE(accel_scan_response_data)))
         return 0;
 

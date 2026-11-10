@@ -50,3 +50,8 @@
 		};
 	};
 };
+
+&adafruit_2_8_tft_touch_v2_ili9340 {
+     mipi-max-frequency = <16000000>;
+    pixel-format = <ILI9XXX_PIXEL_FORMAT_RGB565>;
+};

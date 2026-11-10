@@ -15,10 +15,19 @@
 
 #include <zephyr/drivers/display.h>
 
-#include <lvgl.h>
-#include "lv_data_obj.h"
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
 
-#define FPS 30
+#define DEG_TO_RAD (M_PI / 180.0f)
+
+#define FPS 10
+#define WIDTH 320
+#define HEIGHT 240
+#define SEGMENT_HEIGHT 40
+
+#define Q15_SCALE 32767
+#define Q15_SHIFT 15
 
 static struct bt_uuid_128 ACCEL_SERVICE_UUID =
     BT_UUID_INIT_128(BT_UUID_128_ENCODE(0x12345678, 0x1234, 0x5678, 0x1234, 0x56789abcdef0));
@@ -43,34 +52,19 @@ static struct bt_gatt_discover_params discover_params;
 static struct bt_gatt_subscribe_params subscribe_params;
 
 static const struct device *display_dev = DEVICE_DT_GET(DT_CHOSEN(zephyr_display));
-static lv_obj_t *screen = NULL;
 
-// Display resolution
-const uint16_t display_width = 320;
-const uint16_t display_height = 240;
+static uint8_t screen[WIDTH * HEIGHT];
+static uint16_t screen_segment[WIDTH * SEGMENT_HEIGHT];
 
-struct ball_state 
-{
-    float x, y;
-    float vx, vy;
-    float max_accel;
-    float bouncyness;
 
-    uint8_t diameter;
-    lv_obj_t *circle;
+static struct display_buffer_descriptor desc = {
+    .buf_size = sizeof(screen_segment),
+    .width = WIDTH,
+    .height = SEGMENT_HEIGHT,
+    .pitch = WIDTH,
+    .frame_incomplete = true
 };
 
-// Default ball, values feel smooth
-struct ball_state ball = {
-    .x = 50,
-    .y = 50,
-    .vx = 0,
-    .vy = 0,
-    .max_accel = 1,
-    .bouncyness = 0.6f,
-    .diameter = 30,
-    .circle = NULL
-};
 
 static bool ble_get_adv_device_name_cb(struct bt_data *data, void *user_data)
 {
@@ -271,8 +265,6 @@ static uint8_t notify_func(struct bt_conn *conn, struct bt_gatt_subscribe_params
 
         // Update velocity values based on the tilt of the controller
         // Maps [0, 255] to [-1, 1], 128 represents 0g and means no tilt
-        ball.vx += ball.max_accel * ((vals[1] / 128.0f) - 1);
-        ball.vy += ball.max_accel * ((vals[0] / 128.0f) - 1);
     }
     else
     {
@@ -287,17 +279,68 @@ BT_CONN_CB_DEFINE(conn_callbacks) = {
     .disconnected = ble_on_device_disconnected,
 };
 
+int send_data_to_display(uint16_t *data, size_t length)
+{
+    struct display_buffer_descriptor desc = {
+        .buf_size = length,
+        .width = WIDTH,
+        .height = SEGMENT_HEIGHT,
+        .pitch = WIDTH,
+        .frame_incomplete = true
+    };
+
+    int ret = display_write(display_dev, 0, 0, &desc, data);
+    if (ret < 0)
+    {
+        printk("Display write failed!\n");
+        return ret;
+    }
+
+    return 0;
+}
+
+typedef struct {
+    uint8_t x, y;
+} Vec2_8_t;
+
+typedef struct {
+    int16_t x, y;
+} Vec2_16_t;
+
+typedef struct {
+    int16_t x, y, z;
+} Vec3_16_t;
+
+typedef struct {
+    Vec3_16_t pos, rot;
+    Vec3_16_t vr, vu,vf;
+} Transform_t;
+
+typedef struct {
+    Transform_t transform;
+    uint8_t fov;
+} Camera_t;
+
+typedef struct {
+    Vec3_16_t pos;
+    Vec2_8_t uv;
+} Vertex_t;
+
+typedef struct {
+    Vertex_t *v1, *v2, *v3;
+} Triangle_t;
+
+
+
 int start_central(void)
 {
+    printk("Here");
+
     if (!device_is_ready(display_dev))
     {
         printk("Display is not ready\n");
         return -1;
     }
-
-    screen = lv_screen_active();
-    if (screen == NULL)
-        return -1;
 
     int err = bt_enable(NULL);
     if (err)
@@ -307,51 +350,37 @@ int start_central(void)
     }
     printk("Bluetooth initialized\n");
 
-    ble_start_scanning();
-
-    // Create ball
-    ball.circle = lv_obj_create(screen);
-    lv_obj_set_size(ball.circle, ball.diameter, ball.diameter);
-    lv_obj_set_style_radius(ball.circle, LV_RADIUS_CIRCLE, 0);
-    lv_obj_set_style_bg_color(ball.circle, lv_color_hex(0xFF0000), LV_PART_MAIN);
-    lv_obj_set_pos(ball.circle, ball.x, ball.y);
+    // ble_start_scanning();
 
     display_blanking_off(display_dev);
+
+    Camera_t camera = {{-5, 0, 0}, {0, 90, 0}, 90};
+
+
+
+
     while (1)
     {
-        lv_task_handler();
-        k_msleep(1000 / FPS);
 
-        // Simple ball physics simulation
+        send_data_to_display(screen_segment, sizeof(screen_segment));
+        // for (int y = 0; y < 240; y += 10) {
+        //     // printk("Writing row %d...\n", y);
+        //     ret = display_write(display_dev, 0, y, &desc, buffer);
+        //     for (int i = 0; i < 320 * 10; i++) {
+        //         buffer[i] = test_colors[2];
+        //     }
+        //     // colour += 11
+        //     printk("Result: %d\n", colour);
 
-        // Update ball position
-        ball.x += ball.vx;
-        ball.y += ball.vy;
+        //     if (ret < 0) {
+        //         printk("Display write failed!\n");
+        //         break;
+        //     }
+        // }
+        
 
-        // If ball is off the screen clip it to the bounds and reflect and dampen velocity
-        if (ball.x + ball.diameter > display_width)
-        {
-            ball.x = display_width - ball.diameter;
-            ball.vx *= -ball.bouncyness;
-        }
-        else if (ball.x < 0)
-        {
-            ball.x = 0;
-            ball.vx *= -ball.bouncyness;
-        }
-        if (ball.y + ball.diameter > display_height)
-        {
-            ball.y = display_height - ball.diameter;
-            ball.vy *= -ball.bouncyness;
-        }
-        else if (ball.y < 0)
-        {
-            ball.y = 0;
-            ball.vy *= -ball.bouncyness;
-        }
-
-        // Update ball on screen
-        lv_obj_set_pos(ball.circle, round(ball.x), round(ball.y));
+        
+        // k_msleep(1000 / FPS);
     }
 
     return 0;
